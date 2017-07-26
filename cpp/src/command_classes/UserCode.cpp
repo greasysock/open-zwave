@@ -52,7 +52,7 @@ enum
 	UserCodeIndex_Count		= 255
 };
 
-const uint8 UserCodeLength = 10;
+const uint8 UserCodeLength = 11;
 
 //-----------------------------------------------------------------------------
 // <UserCode::UserCode>
@@ -308,23 +308,57 @@ bool UserCode::SetValue
 	if( (ValueID::ValueType_Raw == _value.GetID().GetType()) && (_value.GetID().GetIndex() < UserCodeIndex_Refresh) )
 	{
 		ValueRaw const* value = static_cast<ValueRaw const*>(&_value);
+
+		
 		uint8* s = value->GetValue();
 		uint8 len = value->GetLength();
-
+		uint8 UserCodeStatus_set = s[0];
+		UserCodeStatus target_status;
+		switch(UserCodeStatus_set){
+			case 0x00:
+			{
+				target_status = UserCode_Available;
+				break;
+			}
+			case 0x01:
+			{ 
+				target_status = UserCode_Occupied;
+				break;
+			}
+			case 0x02:
+			{ 
+				target_status = UserCode_Reserved;
+				break;
+			}
+			case 0xfe:
+			{ 
+				target_status = UserCode_NotAvailable;
+				break;
+			}
+			case 0xff:
+			{ 
+				target_status = UserCode_Unset;
+				break;
+			}
+			default: 
+			{	
+				target_status = UserCode_Occupied;
+			}
+		}
 		if( len > UserCodeLength )
 		{
 			return false;
 		}
-		m_userCodesStatus[value->GetID().GetIndex()] = UserCode_Occupied;
+		m_userCodesStatus[value->GetID().GetIndex()] = target_status;
 		Msg* msg = new Msg( "UserCodeCmd_Set", GetNodeId(), REQUEST, FUNC_ID_ZW_SEND_DATA, true );
 		msg->SetInstance( this, _value.GetID().GetInstance() );
 		msg->Append( GetNodeId() );
-		msg->Append( 4 + len );
+		msg->Append( 3 + len );
 		msg->Append( GetCommandClassId() );
 		msg->Append( UserCodeCmd_Set );
 		msg->Append( value->GetID().GetIndex() );
-		msg->Append( UserCode_Occupied );
-		for( uint8 i = 0; i < len; i++ )
+		msg->Append( target_status );
+		for( uint8 i = 1; i < len; i++ )
 		{
 			msg->Append( s[i] );
 		}
